@@ -21,7 +21,7 @@ class DataInitializer {
             val cuentaInspectoria = Usuario(
                 nombre = "Inspectoría General",
                 correo = correoInspectoria,
-                password = "admin123",
+                password = "Admin123!",
                 rol = Rol.INSPECTORIA,
                 foto = null
             )
