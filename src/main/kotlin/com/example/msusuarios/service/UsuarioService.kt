@@ -4,6 +4,7 @@ import com.example.msusuarios.model.Usuario
 import com.example.msusuarios.repository.UsuarioRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import com.example.msusuarios.model.Rol
 
 @Service
 class UsuarioService(
@@ -17,7 +18,7 @@ class UsuarioService(
             logger.warn("Registro fallido: el correo {} ya está registrado", usuario.correo)
             return null
         }
-        val guardado = usuarioRepository.save(usuario.copy(id = null))
+        val guardado = usuarioRepository.save(usuario.copy(id = null, rol = Rol.PROFESOR))
         logger.info("Usuario registrado exitosamente con ID: {} y rol: {}", guardado.id, guardado.rol)
         return guardado
     }
@@ -56,11 +57,15 @@ class UsuarioService(
             logger.warn("Actualización fallida: no se encontró usuario con ID: {}", id)
             return null
         }
+        if (datos.correo != existente.correo && usuarioRepository.existsByCorreo(datos.correo)) {
+            logger.warn("Actualización fallida: el correo {} ya está registrado", datos.correo)
+            throw CorreoDuplicadoException(datos.correo)
+        }
         val actualizado = existente.copy(
             nombre = datos.nombre,
             correo = datos.correo,
             password = datos.password,
-            rol = datos.rol,
+            rol = existente.rol,
             foto = datos.foto
         )
         val guardado = usuarioRepository.save(actualizado)

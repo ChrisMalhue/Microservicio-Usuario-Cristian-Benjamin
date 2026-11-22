@@ -5,6 +5,7 @@ import com.example.msusuarios.service.UsuarioService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import com.example.msusuarios.service.CorreoDuplicadoException
 
 @RestController
 @RequestMapping("/api/usuarios")
@@ -55,9 +56,16 @@ class UsuarioController(
     }
 
     @PutMapping("/{id}")
-    fun actualizar(@PathVariable id: Int, @RequestBody datos: Usuario): ResponseEntity<Usuario> {
-        val actualizado = usuarioService.actualizar(id, datos)
-        return if (actualizado != null) ResponseEntity.ok(actualizado) else ResponseEntity.notFound().build()
+    fun actualizar(@PathVariable id: Int, @RequestBody datos: Usuario): ResponseEntity<Any> {
+        return try {
+            val actualizado = usuarioService.actualizar(id, datos)
+            if (actualizado != null) ResponseEntity.ok<Any>(actualizado)
+            else ResponseEntity.notFound().build<Any>()
+        } catch (e: CorreoDuplicadoException) {
+            ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(mapOf("mensaje" to "El correo ya está registrado"))
+        }
     }
 
     @DeleteMapping("/{id}")
