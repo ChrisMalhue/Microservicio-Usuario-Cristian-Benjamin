@@ -2,6 +2,7 @@ package com.example.msusuarios.repository
 
 import com.example.msusuarios.model.Rol
 import com.example.msusuarios.model.Usuario
+import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,10 +19,13 @@ import kotlin.test.assertTrue
  * Pruebas de integración del repositorio: usan una base H2 real, pero en memoria
  * (equivalente a la SQLite en memoria de ProductoDaoInstrumentedTest en el ejemplo de clase).
  * No se conectan a Neon. Cada prueba corre dentro de una transacción que se revierte al terminar.
+ * Cuando se comprueba un dato guardado, se vacía la memoria de Hibernate (flush + clear) antes de releer,
+ * para que la lectura vaya a la base y no a un objeto en caché.
  */
 @DataJpaTest
 class UsuarioRepositoryTest(
-    @Autowired private val repository: UsuarioRepository
+    @Autowired private val repository: UsuarioRepository,
+    @Autowired private val em: EntityManager
 ) {
 
     /** Usuario ficticio, sin datos reales. */
@@ -31,6 +35,13 @@ class UsuarioRepositoryTest(
         rol: Rol = Rol.PROFESOR,
         foto: String? = null
     ) = Usuario(nombre = nombre, correo = correo, password = "Clave123", rol = rol, foto = foto)
+
+    /** Escribe en la base, olvida los objetos en memoria y vuelve a leer desde la base. */
+    private fun releer(id: Int): Usuario? {
+        em.flush()
+        em.clear()
+        return repository.findById(id).orElse(null)
+    }
 
     @BeforeEach
     fun partirConTablaVacia() {
@@ -93,9 +104,9 @@ class UsuarioRepositoryTest(
     @Test
     fun elRolSeGuardaYSeLeeCorrectamente() {
         // Arrange
-        val guardado = repository.saveAndFlush(usuario(rol = Rol.INSPECTORIA))
+        val guardado = repository.save(usuario(rol = Rol.INSPECTORIA))
         // Act
-        val leido = repository.findById(guardado.id!!).orElse(null)
+        val leido = releer(guardado.id!!)
         // Assert
         assertEquals(Rol.INSPECTORIA, leido?.rol)
     }
@@ -104,9 +115,9 @@ class UsuarioRepositoryTest(
     fun unaFotoLargaSeGuardaCompleta() {
         // Arrange: la foto se almacena como texto largo (base64), por eso se prueba con 10.000 caracteres
         val fotoLarga = "A".repeat(10_000)
-        val guardado = repository.saveAndFlush(usuario(foto = fotoLarga))
+        val guardado = repository.save(usuario(foto = fotoLarga))
         // Act
-        val leido = repository.findById(guardado.id!!).orElse(null)
+        val leido = releer(guardado.id!!)
         // Assert
         assertEquals(fotoLarga, leido?.foto)
     }
