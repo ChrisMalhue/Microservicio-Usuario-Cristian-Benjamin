@@ -1,16 +1,18 @@
 package com.example.msusuarios.service
 
+import com.example.msusuarios.model.Rol
 import com.example.msusuarios.model.Usuario
 import com.example.msusuarios.repository.UsuarioRepository
 import org.slf4j.LoggerFactory
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
-import com.example.msusuarios.model.Rol
 
 @Service
 class UsuarioService(
     private val usuarioRepository: UsuarioRepository
 ) {
     private val logger = LoggerFactory.getLogger(UsuarioService::class.java)
+    private val passwordEncoder = BCryptPasswordEncoder()
 
     fun registrar(usuario: Usuario): Usuario? {
         logger.info("Intentando registrar usuario con correo: {}", usuario.correo)
@@ -18,7 +20,15 @@ class UsuarioService(
             logger.warn("Registro fallido: el correo {} ya está registrado", usuario.correo)
             return null
         }
-        val guardado = usuarioRepository.save(usuario.copy(id = null, rol = Rol.PROFESOR))
+
+        val passwordEncriptada = passwordEncoder.encode(usuario.password)!!
+        val nuevoUsuario = usuario.copy(
+            id = null,
+            password = passwordEncriptada,
+            rol = Rol.PROFESOR
+        )
+
+        val guardado = usuarioRepository.save(nuevoUsuario)
         logger.info("Usuario registrado exitosamente con ID: {} y rol: {}", guardado.id, guardado.rol)
         return guardado
     }
@@ -26,7 +36,7 @@ class UsuarioService(
     fun login(correo: String, password: String): Usuario? {
         logger.info("Intento de inicio de sesión para: {}", correo)
         val usuario = usuarioRepository.findByCorreo(correo)
-        return if (usuario != null && usuario.password == password) {
+        return if (usuario != null && passwordEncoder.matches(password, usuario.password)) {
             logger.info("Login exitoso para usuario ID: {} ({})", usuario.id, usuario.rol)
             usuario
         } else {
@@ -61,10 +71,17 @@ class UsuarioService(
             logger.warn("Actualización fallida: el correo {} ya está registrado", datos.correo)
             throw CorreoDuplicadoException(datos.correo)
         }
+
+        val passwordFinal = when {
+            datos.password.isBlank() -> existente.password
+            datos.password.startsWith("$2a$") || datos.password.startsWith("$2b$") -> datos.password
+            else -> passwordEncoder.encode(datos.password)!!
+        }
+
         val actualizado = existente.copy(
             nombre = datos.nombre,
             correo = datos.correo,
-            password = datos.password,
+            password = passwordFinal,
             rol = existente.rol,
             foto = datos.foto
         )
